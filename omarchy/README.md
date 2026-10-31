@@ -66,8 +66,26 @@ Remove it at any time:
 sudo omarchy/uninstall.sh
 ```
 
-**After a BIOS update**, uninstall first: the override is built from the F.13
+**Before a BIOS update**, uninstall first: the override is built from the F.13
 table and must not be loaded on other firmware.
+
+## BIOS-change guard
+
+`install.sh` also enables `omen-acpi-bios-guard.service`. On every boot it
+compares the board and BIOS version with `8E35` / `F.13`; if they differ, it
+removes the override, rebuilds the boot images and writes a notice to
+`/var/lib/omen-acpi/BIOS-CHANGED.txt` and the journal
+(`journalctl -t omen-acpi-bios-guard`). The boot on which the change is detected
+has already loaded the old table, so the guard is a safety net, not a
+replacement for uninstalling before updating the BIOS.
+
+For an override installed before the guard existed:
+
+```bash
+sudo omarchy/install.sh --guard-only
+```
+
+`uninstall.sh` removes the guard together with the override.
 
 ## Recovery
 

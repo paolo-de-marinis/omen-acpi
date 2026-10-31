@@ -22,6 +22,8 @@ readonly S5_OEM_REVISION="0107200a"
 readonly COMBINED_OEM_REVISION="0107200b"
 readonly AML_TARGET="/etc/initcpio/acpi_override/omen-acpi-dsdt.aml"
 readonly HOOK_CONF="/etc/mkinitcpio.conf.d/zz-omen-acpi.conf"
+readonly GUARD_TARGET="/usr/local/lib/omen-acpi/bios-guard.sh"
+readonly GUARD_UNIT="/etc/systemd/system/omen-acpi-bios-guard.service"
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly PROBE="$SCRIPT_DIR/../scripts/00-probe-boot.sh"
@@ -29,12 +31,29 @@ readonly PROBE="$SCRIPT_DIR/../scripts/00-probe-boot.sh"
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 usage() {
-    printf 'Usage: sudo %s BUILD_ARCHIVE\n\n' "$0"
+    printf 'Usage: sudo %s BUILD_ARCHIVE\n' "$0"
+    printf '       sudo %s --guard-only\n\n' "$0"
     printf 'BUILD_ARCHIVE is the omen-dsdt-f13-*-build-*.tar.gz created by scripts/02-build-dsdt.sh.\n'
+    printf '%s\n' '--guard-only installs only the BIOS-change guard for an existing override.'
+}
+
+# Boot service that removes the override automatically if the BIOS changes.
+install_guard() {
+    install -D -m 0755 "$SCRIPT_DIR/bios-guard.sh" "$GUARD_TARGET"
+    install -D -m 0644 "$SCRIPT_DIR/omen-acpi-bios-guard.service" "$GUARD_UNIT"
+    systemctl daemon-reload
+    systemctl enable omen-acpi-bios-guard.service
+    printf 'Installed the BIOS-change guard (omen-acpi-bios-guard.service).\n'
 }
 
 [[ $# -eq 1 && "$1" != -h && "$1" != --help ]] || { usage; [[ "${1:-}" == -h || "${1:-}" == --help ]]; exit $?; }
 [[ $EUID -eq 0 ]] || die "Run as root (sudo)."
+
+if [[ "$1" == --guard-only ]]; then
+    [[ -e "$AML_TARGET" ]] || die "No override is installed; run the full install instead."
+    install_guard
+    exit 0
+fi
 
 archive="$(realpath -- "$1")"
 [[ -f "$archive" ]] || die "Build archive not found: $archive"
@@ -90,6 +109,8 @@ if ! limine-mkinitcpio; then
     limine-mkinitcpio || true
     die "Boot image rebuild failed; the override was removed again."
 fi
+
+install_guard
 
 printf '\nInstalled the %s DSDT override. Reboot, then verify with:\n' "$variant"
 printf '  sudo scripts/00-probe-boot.sh --human   (expect revision 0x%s)\n' "$revision"

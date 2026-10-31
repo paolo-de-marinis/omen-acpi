@@ -13,6 +13,14 @@ readonly HOOK_CONF="/etc/mkinitcpio.conf.d/zz-omen-acpi.conf"
 
 [[ $EUID -eq 0 ]] || { printf 'ERROR: Run as root (sudo).\n' >&2; exit 1; }
 
+if [[ -e /etc/systemd/system/omen-acpi-bios-guard.service ]]; then
+    systemctl disable omen-acpi-bios-guard.service 2>/dev/null || true
+    rm -f /etc/systemd/system/omen-acpi-bios-guard.service
+    rm -rf /usr/local/lib/omen-acpi
+    systemctl daemon-reload
+    printf 'Removed the BIOS-change guard.\n'
+fi
+
 if [[ ! -e "$AML_TARGET" && ! -e "$HOOK_CONF" ]]; then
     printf 'No OMEN ACPI override is installed.\n'
     exit 0
