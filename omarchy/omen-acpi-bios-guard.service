@@ -1,0 +1,13 @@
+[Unit]
+Description=Remove the OMEN ACPI DSDT override if the BIOS changed
+Documentation=https://github.com/paolo-de-marinis/omen-acpi
+ConditionPathExists=|/etc/initcpio/acpi_override/omen-acpi-dsdt.aml
+ConditionPathExists=|/etc/mkinitcpio.conf.d/zz-omen-acpi.conf
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/omen-acpi/bios-guard.sh
+
+[Install]
+WantedBy=multi-user.target
